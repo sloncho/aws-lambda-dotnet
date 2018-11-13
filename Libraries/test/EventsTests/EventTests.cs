@@ -424,6 +424,10 @@ namespace Amazon.Lambda.Tests
                 var queryStringParameters = proxyEvent.QueryStringParameters;
                 Assert.Equal(queryStringParameters["name"], "me");
 
+                var multiValueQueryStringParameters = proxyEvent.MultiValueQueryStringParameters;
+                Assert.Equal(multiValueQueryStringParameters["color"], new[] {"red", "yellow", "blue"});
+                Assert.Equal(multiValueQueryStringParameters["type"], new[] {"some", "other"});
+
                 var pathParameters = proxyEvent.PathParameters;
                 Assert.Equal(pathParameters["proxy"], "hello/world");
 

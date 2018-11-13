@@ -35,6 +35,11 @@
         public IDictionary<string, string> QueryStringParameters { get; set; }
 
         /// <summary>
+        /// MultiString query parameters of the form type=some&amp;type=other&amp;type=yetanother
+        /// </summary>
+        public IDictionary<string, string[]> MultiValueQueryStringParameters { get; set; }
+
+        /// <summary>
         /// The path parameters that were part of the request
         /// </summary>
         public IDictionary<string, string> PathParameters { get; set; }

@@ -26,6 +26,10 @@
   "queryStringParameters": {
     "name": "me"
   },
+  "multiValueQueryStringParameters": {
+      "color": ["red", "yellow", "blue"],
+      "type":  ["some", "other"]
+  },
   "pathParameters": {
     "proxy": "hello/world"
   },

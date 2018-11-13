@@ -526,6 +526,23 @@ namespace Amazon.Lambda.AspNetCoreServer
                     requestFeatures.QueryString = string.Empty;
                 }
 
+                // API Gateway delivers multi-value query parameters in a dictionary, which needs to be reconstructed
+                // before passing into APS.NET core framework
+                if (apiGatewayRequest.MultiValueQueryStringParameters != null)
+                {
+                    var pairs = apiGatewayRequest.MultiValueQueryStringParameters.SelectMany(kvp =>
+                        kvp.Value.Select(v => $"{WebUtility.UrlEncode(kvp.Key)}={WebUtility.UrlEncode(v)}"))
+                        .ToArray();
+                    if (pairs.Length > 0)
+                    {
+                        var multiValueQueryString = string.Join("&", pairs);
+
+                        requestFeatures.QueryString = string.IsNullOrWhiteSpace(requestFeatures.QueryString)
+                            ? multiValueQueryString
+                            : requestFeatures.QueryString += $"&{multiValueQueryString}";
+                    }
+                }
+
                 var headers = apiGatewayRequest.Headers;
                 if (headers != null)
                 {
