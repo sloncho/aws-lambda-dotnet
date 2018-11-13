@@ -17,10 +17,6 @@ namespace Amazon.Lambda.AspNetCoreServer.Test
 {
     public class TestCallingWebAPI
     {
-        public TestCallingWebAPI()
-        {
-        }
-
         [Fact]
         public async Task TestGetAllValues()
         {
@@ -73,7 +69,7 @@ namespace Amazon.Lambda.AspNetCoreServer.Test
             var response = await this.InvokeAPIGatewayRequest("values-get-multivaluequerystringparameters-apigatway-request.json");
 
             Assert.Equal(200, response.StatusCode);
-            Assert.Equal("Sunny paints with green, red, yellow, blue", response.Body);
+            Assert.Equal("Sunny paints with red, yellow, blue", response.Body);
             Assert.True(response.Headers.ContainsKey("Content-Type"));
             Assert.Equal("text/plain; charset=utf-8", response.Headers["Content-Type"]);
         }

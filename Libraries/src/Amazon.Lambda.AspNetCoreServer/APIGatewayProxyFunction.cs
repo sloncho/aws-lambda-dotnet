@@ -1,7 +1,6 @@
 ﻿using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.AspNetCoreServer.Internal;
 using Amazon.Lambda.Core;
-using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Internal;
 using Microsoft.AspNetCore.Http.Features;
@@ -17,7 +16,6 @@ using System.Net;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 
 namespace Amazon.Lambda.AspNetCoreServer
@@ -504,44 +502,7 @@ namespace Amazon.Lambda.AspNetCoreServer
                     }
                 }
 
-
-                // API Gateway delivers the query string in a dictionary but must be reconstructed into the full query string
-                // before passing into ASP.NET Core framework.
-                var queryStringParameters = apiGatewayRequest.QueryStringParameters;
-                if (queryStringParameters != null)
-                {
-                    StringBuilder sb = new StringBuilder("?");
-                    foreach (var kvp in queryStringParameters)
-                    {
-                        if (sb.Length > 1)
-                        {
-                            sb.Append("&");
-                        }
-                        sb.Append($"{WebUtility.UrlEncode(kvp.Key)}={WebUtility.UrlEncode(kvp.Value.ToString())}");
-                    }
-                    requestFeatures.QueryString = sb.ToString();
-                }
-                else
-                {
-                    requestFeatures.QueryString = string.Empty;
-                }
-
-                // API Gateway delivers multi-value query parameters in a dictionary, which needs to be reconstructed
-                // before passing into APS.NET core framework
-                if (apiGatewayRequest.MultiValueQueryStringParameters != null)
-                {
-                    var pairs = apiGatewayRequest.MultiValueQueryStringParameters.SelectMany(kvp =>
-                        kvp.Value.Select(v => $"{WebUtility.UrlEncode(kvp.Key)}={WebUtility.UrlEncode(v)}"))
-                        .ToArray();
-                    if (pairs.Length > 0)
-                    {
-                        var multiValueQueryString = string.Join("&", pairs);
-
-                        requestFeatures.QueryString = string.IsNullOrWhiteSpace(requestFeatures.QueryString)
-                            ? multiValueQueryString
-                            : requestFeatures.QueryString += $"&{multiValueQueryString}";
-                    }
-                }
+                requestFeatures.QueryString = PrepareQueryString(apiGatewayRequest);
 
                 var headers = apiGatewayRequest.Headers;
                 if (headers != null)
@@ -559,7 +520,6 @@ namespace Amazon.Lambda.AspNetCoreServer
 
                     requestFeatures.Headers["Host"] = $"apigateway-{apiId}-{stage}";
                 }
-
 
                 if (!string.IsNullOrEmpty(apiGatewayRequest.Body))
                 {
@@ -720,6 +680,51 @@ namespace Amazon.Lambda.AspNetCoreServer
                     break;
                 }
             }
+        }
+
+        /// <summary>
+        /// Extract sing gle and multi-value query parameters from API Gateway request and reconstructs them
+        /// for use in ASP.Net core framework
+        /// </summary>
+        /// <param name="apiGatewayRequest"></param>
+        /// <returns>Url encoded query string</returns>
+        private static string PrepareQueryString(APIGatewayProxyRequest apiGatewayRequest)
+        {
+            var queryParameterPairs = Enumerable.Empty<string>();
+            // API Gateway delivers multi-value query parameters in a dictionary, which needs to be reconstructed
+            // before passing into APS.NET core framework
+            if (apiGatewayRequest.MultiValueQueryStringParameters != null)
+            {
+                queryParameterPairs = apiGatewayRequest.MultiValueQueryStringParameters
+                    .SelectMany(kvp => kvp.Value.Select(v => new KeyValuePair<string, string>(kvp.Key, v)))
+                    .Select(BuildEscapedQueryString);
+            }
+
+            // API Gateway delivers the query string in a dictionary but must be reconstructed into the full query string
+            // before passing into ASP.NET Core framework.
+            if (apiGatewayRequest.QueryStringParameters != null)
+            {
+                // query parameters contain the last of multi-value params with the same key
+                // we need to remove it
+                // see https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#apigateway-multivalue-headers-and-parameters
+                var cleanedUp = apiGatewayRequest.QueryStringParameters
+                    .Where(p => !
+                    (
+                        (apiGatewayRequest.MultiValueQueryStringParameters?.ContainsKey(p.Key)).GetValueOrDefault()
+                        && apiGatewayRequest.MultiValueQueryStringParameters[p.Key].Contains(p.Value)
+                    ));
+                queryParameterPairs =
+                    queryParameterPairs.Concat(cleanedUp.Select(BuildEscapedQueryString));
+            }
+
+            return queryParameterPairs.Any()
+                ? $"?{string.Join("&", queryParameterPairs)}"
+                : string.Empty;
+        }
+
+        private static string BuildEscapedQueryString(KeyValuePair<string, string> queryPair)
+        {
+            return $"{WebUtility.UrlEncode(queryPair.Key)}={WebUtility.UrlEncode(queryPair.Value)}";
         }
     }
 }
